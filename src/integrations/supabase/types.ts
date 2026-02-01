@@ -14,7 +14,216 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      aptitude_test_results: {
+        Row: {
+          correct_answers: number
+          created_at: string
+          id: string
+          score: number
+          test_type: string
+          time_taken_seconds: number | null
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          correct_answers: number
+          created_at?: string
+          id?: string
+          score: number
+          test_type: string
+          time_taken_seconds?: number | null
+          total_questions: number
+          user_id: string
+        }
+        Update: {
+          correct_answers?: number
+          created_at?: string
+          id?: string
+          score?: number
+          test_type?: string
+          time_taken_seconds?: number | null
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_history: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coding_attempts: {
+        Row: {
+          code: string
+          created_at: string
+          difficulty: string
+          feedback: string | null
+          id: string
+          language: string
+          passed: boolean | null
+          question_id: string
+          question_title: string
+          score: number | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          difficulty: string
+          feedback?: string | null
+          id?: string
+          language: string
+          passed?: boolean | null
+          question_id: string
+          question_title: string
+          score?: number | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          difficulty?: string
+          feedback?: string | null
+          id?: string
+          language?: string
+          passed?: boolean | null
+          question_id?: string
+          question_title?: string
+          score?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      interview_results: {
+        Row: {
+          answers: Json | null
+          created_at: string
+          feedback: Json | null
+          id: string
+          interview_type: string
+          overall_score: number | null
+          questions: Json | null
+          round: number | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          created_at?: string
+          feedback?: Json | null
+          id?: string
+          interview_type: string
+          overall_score?: number | null
+          questions?: Json | null
+          round?: number | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          created_at?: string
+          feedback?: Json | null
+          id?: string
+          interview_type?: string
+          overall_score?: number | null
+          questions?: Json | null
+          round?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          education: string | null
+          email: string | null
+          experience_years: number | null
+          full_name: string | null
+          id: string
+          skills: string[] | null
+          target_role: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          education?: string | null
+          email?: string | null
+          experience_years?: number | null
+          full_name?: string | null
+          id?: string
+          skills?: string[] | null
+          target_role?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          education?: string | null
+          email?: string | null
+          experience_years?: number | null
+          full_name?: string | null
+          id?: string
+          skills?: string[] | null
+          target_role?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      resume_analysis: {
+        Row: {
+          analysis_result: Json | null
+          created_at: string
+          file_name: string
+          id: string
+          score: number | null
+          suggestions: string[] | null
+          user_id: string
+        }
+        Insert: {
+          analysis_result?: Json | null
+          created_at?: string
+          file_name: string
+          id?: string
+          score?: number | null
+          suggestions?: string[] | null
+          user_id: string
+        }
+        Update: {
+          analysis_result?: Json | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          score?: number | null
+          suggestions?: string[] | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
