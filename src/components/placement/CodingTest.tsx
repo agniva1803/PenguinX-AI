@@ -26,7 +26,7 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 const TOPIC_OPTIONS = [
-  { value: "", label: "All Topics" },
+  { value: "all", label: "All Topics" },
   { value: "arrays", label: "Arrays" },
   { value: "strings", label: "Strings" },
   { value: "linked-lists", label: "Linked Lists" },
@@ -42,7 +42,7 @@ export const CodingTest = () => {
   const [selectedQuestion, setSelectedQuestion] = useState<CodingQuestion | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [difficulty, setDifficulty] = useState("easy");
-  const [topic, setTopic] = useState("");
+  const [topic, setTopic] = useState("all");
   const { toast } = useToast();
 
   const generateQuestions = async () => {
@@ -51,7 +51,7 @@ export const CodingTest = () => {
       const { data, error } = await supabase.functions.invoke("generate-coding-questions", {
         body: {
           difficulty,
-          topic: topic || undefined,
+          topic: topic === "all" ? undefined : topic,
           count: 5,
         },
       });
