@@ -299,7 +299,20 @@ export const AptitudeTest = () => {
   // Active test
   const currentQuestion = questions[currentIndex];
   const answeredCount = Object.keys(answers).length;
-  const progress = ((currentIndex + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
+
+  // Guard: wait for questions to load with valid options
+  if (!currentQuestion || !Array.isArray(currentQuestion.options)) {
+    return (
+      <Card variant="elevated" className="p-12">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Loading Question</h3>
+          <p className="text-muted-foreground">Please wait...</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="elevated">
