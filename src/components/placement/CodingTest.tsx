@@ -75,9 +75,10 @@ export const CodingTest = () => {
     }
   };
 
+  // Auto-fetch when difficulty or topic changes
   useEffect(() => {
     generateQuestions();
-  }, []);
+  }, [difficulty, topic]);
 
   const difficultyColor = {
     easy: "bg-success/10 text-success border-success/20",
