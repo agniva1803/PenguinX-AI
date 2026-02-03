@@ -69,7 +69,30 @@ export const AptitudeTest = () => {
       if (error) throw error;
 
       if (data?.questions && Array.isArray(data.questions)) {
-        setQuestions(data.questions);
+        // Transform API response to match component's expected format
+        const transformedQuestions: Question[] = data.questions.map((q: {
+          id: number;
+          question: string;
+          options: Record<string, string>;
+          correctAnswer: string;
+          explanation: string;
+          difficulty?: string;
+        }) => {
+          const optionKeys = ['A', 'B', 'C', 'D'];
+          const optionsArray = optionKeys.map(key => q.options[key] || '');
+          const correctIndex = optionKeys.indexOf(q.correctAnswer);
+          
+          return {
+            id: String(q.id),
+            question: q.question,
+            options: optionsArray,
+            correctAnswer: correctIndex >= 0 ? correctIndex : 0,
+            explanation: q.explanation,
+            topic: q.difficulty || 'medium',
+          };
+        });
+        
+        setQuestions(transformedQuestions);
         setStartTime(Date.now());
       } else {
         throw new Error("Invalid response format");
