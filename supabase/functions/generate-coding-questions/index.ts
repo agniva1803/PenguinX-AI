@@ -43,7 +43,11 @@ ${difficultyGuide[difficulty] || difficultyGuide.medium}
 
 ${topic ? `TOPIC FOCUS: ${topic}` : 'Cover common interview topics like arrays, strings, algorithms, and data structures.'}
 
-CRITICAL: The difficulty MUST match "${difficulty}". Do NOT generate easier problems. Each problem must be appropriately challenging for the specified level.
+CRITICAL RULES:
+1. The difficulty MUST match "${difficulty}". Do NOT generate easier problems.
+2. Use plain text only - NO LaTeX, NO math symbols like $, \\le, \\ge, \\sum. Write "less than or equal to" instead of \\le.
+3. Use simple variable names like "n", "nums", "target" - avoid mathematical notation.
+4. All JSON strings must be properly escaped. Use regular quotes and avoid special characters.
 
 For each question, provide:
 1. A unique ID (use format: q_<random_6_chars>)
@@ -51,11 +55,11 @@ For each question, provide:
 3. Difficulty level (MUST be "${difficulty}")
 4. Problem description (clear, detailed, real-world context when possible)
 5. Example inputs and outputs (2-3 examples with explanations)
-6. Constraints (realistic bounds)
+6. Constraints (realistic bounds, use plain English like "n is between 1 and 10000")
 7. Test cases (4-6 test cases including edge cases)
 8. Hints (2-3 progressive hints)
 
-Respond in JSON format:
+Respond ONLY with valid JSON (no markdown code blocks):
 {
   "questions": [
     {
@@ -66,9 +70,9 @@ Respond in JSON format:
       "examples": [
         {"input": "example input", "output": "expected output", "explanation": "Why this is the answer"}
       ],
-      "constraints": ["constraint 1", "constraint 2"],
+      "constraints": ["1 <= n <= 10000", "constraint 2"],
       "testCases": [
-        {"input": {"param1": value1}, "expected": expectedValue}
+        {"input": {"param1": "value1"}, "expected": "expectedValue"}
       ],
       "hints": ["Hint 1", "Hint 2"]
     }
@@ -87,8 +91,8 @@ Respond in JSON format:
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate ${count} ${difficulty} level coding question(s)${topic ? ` about ${topic}` : ''}.` }
         ],
-        max_tokens: 2048,
-        temperature: 0.8,
+        max_tokens: 8192,
+        temperature: 0.7,
       }),
     });
 
@@ -100,14 +104,54 @@ Respond in JSON format:
 
     const data = await response.json();
     const content = data.choices[0].message.content;
+    console.log("AI Response length:", content.length);
     
     let questions;
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonString = jsonMatch ? jsonMatch[1] : content;
+      // Try multiple JSON extraction patterns
+      let jsonString = content;
+      
+      // Pattern 1: JSON in code blocks
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonString = codeBlockMatch[1];
+      } else {
+        // Pattern 2: Find JSON object directly
+        const jsonObjectMatch = content.match(/\{[\s\S]*"questions"[\s\S]*\}/);
+        if (jsonObjectMatch) {
+          jsonString = jsonObjectMatch[0];
+        }
+      }
+      
+      // Clean up common issues before parsing
+      jsonString = jsonString
+        .trim()
+        // Fix unescaped special characters in strings - replace $..$ math notation
+        .replace(/\$([^$]+)\$/g, '$1')
+        // Fix any unescaped backslashes that aren't valid escape sequences
+        .replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+      
       questions = JSON.parse(jsonString);
-    } catch {
-      questions = { questions: [] };
+      console.log("Parsed questions count:", questions.questions?.length || 0);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      console.error("Content preview:", content.substring(0, 500));
+      
+      // Fallback: try to extract any valid JSON array of questions
+      try {
+        const fallbackMatch = content.match(/"questions"\s*:\s*\[([\s\S]*?)\]/);
+        if (fallbackMatch) {
+          const cleanedArray = fallbackMatch[1]
+            .replace(/\$([^$]+)\$/g, '$1')
+            .replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+          questions = { questions: JSON.parse(`[${cleanedArray}]`) };
+          console.log("Fallback parsed questions count:", questions.questions?.length || 0);
+        } else {
+          questions = { questions: [] };
+        }
+      } catch {
+        questions = { questions: [] };
+      }
     }
 
     return new Response(JSON.stringify(questions), {
