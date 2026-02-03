@@ -12,9 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { action, interviewType, role, answer, question, round } = await req.json();
+    const { action, interviewType, role, answers, questions: inputQuestions, round } = await req.json();
     
-    if (action === 'generate_questions') {
+    if (action === 'generate' || action === 'generate_questions') {
       const systemPrompt = `You are an expert interviewer. Generate 5 interview questions for a ${interviewType} interview for the role of ${role || 'Software Engineer'}.
 
 Round ${round || 1} focus:
@@ -76,28 +76,39 @@ Respond in JSON format:
       });
     }
     
-    if (action === 'evaluate_answer') {
-      const systemPrompt = `You are an expert interview coach. Evaluate the candidate's answer to the interview question.
+    if (action === 'evaluate' || action === 'evaluate_answer') {
+      // Build a summary of all questions and answers for evaluation
+      const qaList = (inputQuestions || []).map((q: { id: string; question: string }, i: number) => {
+        const answer = answers?.[q.id] || "";
+        return `Question ${i + 1}: ${q.question}\nAnswer: ${answer || "(No answer provided)"}`;
+      }).join("\n\n");
+
+      const systemPrompt = `You are an expert interview coach. Evaluate the candidate's interview performance based on all their answers.
 
 Provide feedback on:
 1. Content quality and relevance
-2. Structure and clarity
+2. Structure and clarity  
 3. Use of STAR method (for behavioral questions)
 4. Technical accuracy (for technical questions)
 5. Communication skills
 
-Score the answer from 0-100 and provide actionable feedback.
-
 Respond in JSON format:
 {
-  "score": 85,
+  "overallScore": 75,
   "feedback": {
-    "strengths": ["Clear structure", "Good examples"],
-    "improvements": ["Could add more specific metrics"],
-    "overall": "Strong answer with room for improvement"
+    "communication": "Assessment of communication skills",
+    "content": "Assessment of content quality",
+    "structure": "Assessment of answer structure",
+    "overallRecommendation": "Overall recommendation for improvement"
   },
-  "tips": ["Practice the STAR method", "Prepare more quantifiable achievements"],
-  "modelAnswer": "A brief example of an ideal answer structure"
+  "questionFeedback": {
+    "question_id": {
+      "score": 80,
+      "strengths": ["Good example"],
+      "improvements": ["Add metrics"],
+      "suggestion": "Brief suggestion"
+    }
+  }
 }`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -110,9 +121,9 @@ Respond in JSON format:
           model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Question: ${question}\n\nCandidate's Answer: ${answer}\n\nPlease evaluate this answer.` }
+            { role: "user", content: `Interview Type: ${interviewType}\n\nQuestions and Answers:\n${qaList}\n\nPlease evaluate this interview performance.` }
           ],
-          max_tokens: 1024,
+          max_tokens: 2048,
           temperature: 0.5,
         }),
       });
@@ -131,18 +142,18 @@ Respond in JSON format:
         evaluation = JSON.parse(jsonString);
       } catch {
         evaluation = {
-          score: 70,
+          overallScore: 70,
           feedback: {
-            strengths: [],
-            improvements: [],
-            overall: content
+            communication: "Good effort",
+            content: "Satisfactory content",
+            structure: "Could improve structure",
+            overallRecommendation: content
           },
-          tips: [],
-          modelAnswer: ""
+          questionFeedback: {}
         };
       }
 
-      return new Response(JSON.stringify({ evaluation }), {
+      return new Response(JSON.stringify(evaluation), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
