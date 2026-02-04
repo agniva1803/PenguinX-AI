@@ -12,11 +12,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import * as pdfjsLib from "pdfjs-dist";
-import mammoth from "mammoth";
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ResumeAnalysis {
   score: number;
@@ -40,28 +35,6 @@ export const ResumeUploader = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(" ");
-      fullText += pageText + "\n";
-    }
-    
-    return fullText.trim();
-  };
-
-  const extractTextFromDocx = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value.trim();
-  };
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -85,15 +58,15 @@ export const ResumeUploader = () => {
   const handleFile = async (selectedFile: File) => {
     if (!selectedFile) return;
     
-    // Check file type
-    const validTypes = ['text/plain', 'application/pdf', 'application/msword', 
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const fileName = selectedFile.name.toLowerCase();
+    const validExtensions = ['.txt', '.pdf', '.docx'];
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
     
-    if (!validTypes.includes(selectedFile.type) && !selectedFile.name.endsWith('.txt')) {
+    if (!hasValidExtension) {
       toast({
         variant: "destructive",
         title: "Invalid file type",
-        description: "Please upload a PDF, Word, or text file.",
+        description: "Please upload a PDF, Word (.docx), or text file.",
       });
       return;
     }
@@ -105,23 +78,25 @@ export const ResumeUploader = () => {
     try {
       let extractedText = "";
       
-      if (selectedFile.type === 'text/plain' || selectedFile.name.endsWith('.txt')) {
+      if (fileName.endsWith('.txt')) {
+        // Read text files directly in browser
         extractedText = await selectedFile.text();
-      } else if (selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf')) {
-        extractedText = await extractTextFromPDF(selectedFile);
-      } else if (
-        selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        selectedFile.name.endsWith('.docx')
-      ) {
-        extractedText = await extractTextFromDocx(selectedFile);
-      } else if (selectedFile.type === 'application/msword' || selectedFile.name.endsWith('.doc')) {
-        toast({
-          variant: "destructive",
-          title: "Legacy .doc format",
-          description: "Please save your resume as .docx or .pdf for automatic parsing.",
+      } else {
+        // Send PDF/DOCX to edge function for parsing
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        const { data, error } = await supabase.functions.invoke("parse-resume", {
+          body: formData,
         });
-        setIsParsing(false);
-        return;
+
+        if (error) throw error;
+        
+        if (data?.text) {
+          extractedText = data.text;
+        } else {
+          throw new Error("No text extracted from file");
+        }
       }
       
       if (extractedText) {
