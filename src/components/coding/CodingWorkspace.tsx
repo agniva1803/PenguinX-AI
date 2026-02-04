@@ -115,19 +115,36 @@ export function CodingWorkspace({ question, onBack }: CodingWorkspaceProps) {
       setActiveTab("results");
 
       // Save attempt to database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("coding_attempts").insert({
-          user_id: user.id,
-          question_id: question.id,
-          question_title: question.title,
-          difficulty: question.difficulty,
-          language,
-          code,
-          passed: data.evaluation.passed,
-          score: data.evaluation.score,
-          feedback: data.evaluation.summary,
-        });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { error: insertError } = await supabase.from("coding_attempts").insert({
+            user_id: user.id,
+            question_id: question.id,
+            question_title: question.title,
+            difficulty: question.difficulty,
+            language,
+            code,
+            passed: data.evaluation.passed,
+            score: data.evaluation.score,
+            feedback: data.evaluation.summary,
+          });
+          
+          if (insertError) {
+            console.error("Failed to save coding attempt:", insertError);
+            throw insertError;
+          }
+          console.log("Coding attempt saved successfully");
+        } else {
+          console.warn("User not logged in - attempt not saved");
+          toast({
+            variant: "destructive",
+            title: "Not logged in",
+            description: "Your attempt was not saved. Please log in to track progress.",
+          });
+        }
+      } catch (saveError) {
+        console.error("Error saving coding attempt:", saveError);
       }
 
       toast({

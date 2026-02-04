@@ -239,16 +239,33 @@ export const InterviewPractice = () => {
       setResult(data);
 
       // Save to database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("interview_results").insert({
-          user_id: user.id,
-          interview_type: activeInterview!,
-          questions: JSON.parse(JSON.stringify(questions)),
-          answers: JSON.parse(JSON.stringify(finalAnswers)),
-          feedback: JSON.parse(JSON.stringify(data.feedback)),
-          overall_score: data.overallScore,
-        });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { error: insertError } = await supabase.from("interview_results").insert({
+            user_id: user.id,
+            interview_type: activeInterview!,
+            questions: JSON.parse(JSON.stringify(questions)),
+            answers: JSON.parse(JSON.stringify(finalAnswers)),
+            feedback: JSON.parse(JSON.stringify(data.feedback)),
+            overall_score: data.overallScore,
+          });
+          
+          if (insertError) {
+            console.error("Failed to save interview result:", insertError);
+            throw insertError;
+          }
+          console.log("Interview result saved successfully");
+        } else {
+          console.warn("User not logged in - results not saved");
+          toast({
+            variant: "destructive",
+            title: "Not logged in",
+            description: "Your results were not saved. Please log in to track progress.",
+          });
+        }
+      } catch (saveError) {
+        console.error("Error saving interview result:", saveError);
       }
 
       // Stop media streams

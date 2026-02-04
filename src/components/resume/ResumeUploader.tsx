@@ -147,15 +147,32 @@ export const ResumeUploader = () => {
         setAnalysis(data.analysis);
         
         // Save to database
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from("resume_analysis").insert({
-            user_id: user.id,
-            file_name: file?.name || "pasted_resume",
-            score: data.analysis.score,
-            suggestions: data.analysis.actionItems,
-            analysis_result: data.analysis,
-          });
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { error: insertError } = await supabase.from("resume_analysis").insert({
+              user_id: user.id,
+              file_name: file?.name || "pasted_resume",
+              score: data.analysis.score,
+              suggestions: data.analysis.actionItems,
+              analysis_result: data.analysis,
+            });
+            
+            if (insertError) {
+              console.error("Failed to save resume analysis:", insertError);
+              throw insertError;
+            }
+            console.log("Resume analysis saved successfully");
+          } else {
+            console.warn("User not logged in - analysis not saved");
+            toast({
+              variant: "destructive",
+              title: "Not logged in",
+              description: "Your analysis was not saved. Please log in to track progress.",
+            });
+          }
+        } catch (saveError) {
+          console.error("Error saving resume analysis:", saveError);
         }
 
         toast({

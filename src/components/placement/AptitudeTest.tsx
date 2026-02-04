@@ -162,16 +162,33 @@ export const AptitudeTest = () => {
       setResult(testResult);
 
       // Save to database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("aptitude_test_results").insert({
-          user_id: user.id,
-          test_type: activeTest!,
-          score,
-          correct_answers: correct,
-          total_questions: questions.length,
-          time_taken_seconds: timeTaken,
-        });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { error: insertError } = await supabase.from("aptitude_test_results").insert({
+            user_id: user.id,
+            test_type: activeTest!,
+            score,
+            correct_answers: correct,
+            total_questions: questions.length,
+            time_taken_seconds: timeTaken,
+          });
+          
+          if (insertError) {
+            console.error("Failed to save aptitude result:", insertError);
+            throw insertError;
+          }
+          console.log("Aptitude result saved successfully");
+        } else {
+          console.warn("User not logged in - results not saved");
+          toast({
+            variant: "destructive",
+            title: "Not logged in",
+            description: "Your results were not saved. Please log in to track progress.",
+          });
+        }
+      } catch (saveError) {
+        console.error("Error saving aptitude result:", saveError);
       }
 
       toast({
