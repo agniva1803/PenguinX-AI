@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   FileText, Upload, Sparkles, Loader2, CheckCircle2, 
   AlertTriangle, Target, TrendingUp, Lightbulb, FileCheck
@@ -13,6 +12,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ResumeAnalysis {
   score: number;
@@ -30,11 +34,34 @@ export const ResumeUploader = () => {
   const [resumeText, setResumeText] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+    
+    return fullText.trim();
+  };
+
+  const extractTextFromDocx = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value.trim();
+  };
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -72,17 +99,53 @@ export const ResumeUploader = () => {
     }
     
     setFile(selectedFile);
+    setIsParsing(true);
+    setResumeText("");
     
-    // For text files, read content directly
-    if (selectedFile.type === 'text/plain' || selectedFile.name.endsWith('.txt')) {
-      const text = await selectedFile.text();
-      setResumeText(text);
-    } else {
-      // For PDF/Word, we'll need the user to paste the text
+    try {
+      let extractedText = "";
+      
+      if (selectedFile.type === 'text/plain' || selectedFile.name.endsWith('.txt')) {
+        extractedText = await selectedFile.text();
+      } else if (selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf')) {
+        extractedText = await extractTextFromPDF(selectedFile);
+      } else if (
+        selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        selectedFile.name.endsWith('.docx')
+      ) {
+        extractedText = await extractTextFromDocx(selectedFile);
+      } else if (selectedFile.type === 'application/msword' || selectedFile.name.endsWith('.doc')) {
+        toast({
+          variant: "destructive",
+          title: "Legacy .doc format",
+          description: "Please save your resume as .docx or .pdf for automatic parsing.",
+        });
+        setIsParsing(false);
+        return;
+      }
+      
+      if (extractedText) {
+        setResumeText(extractedText);
+        toast({
+          title: "Resume parsed successfully!",
+          description: `Extracted ${extractedText.split(/\s+/).length} words from your resume.`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not extract text",
+          description: "The file appears to be empty or unreadable.",
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing file:", error);
       toast({
-        title: "File uploaded",
-        description: "Please paste your resume text below for analysis, or upload a .txt file.",
+        variant: "destructive",
+        title: "Parsing failed",
+        description: "Could not extract text from the file. Please try a different format.",
       });
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -183,9 +246,19 @@ export const ResumeUploader = () => {
             {file ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-center gap-2">
-                  <FileCheck className="w-5 h-5 text-success" />
+                  {isParsing ? (
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  ) : (
+                    <FileCheck className="w-5 h-5 text-success" />
+                  )}
                   <span className="font-medium">{file.name}</span>
                 </div>
+                {isParsing && (
+                  <p className="text-sm text-muted-foreground">Extracting text from your resume...</p>
+                )}
+                {!isParsing && resumeText && (
+                  <p className="text-sm text-success">✓ {resumeText.split(/\s+/).length} words extracted</p>
+                )}
                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                   Change File
                 </Button>
@@ -197,21 +270,23 @@ export const ResumeUploader = () => {
                   <Upload className="w-4 h-4 mr-2" />
                   Select File
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">Supports PDF, Word, and text files</p>
+                <p className="text-xs text-muted-foreground mt-2">Supports PDF, Word (.docx), and text files</p>
               </>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="resumeText">Resume Text</Label>
-            <Textarea
-              id="resumeText"
-              placeholder="Paste your resume text here for analysis..."
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              className="min-h-[200px] font-mono text-sm"
-            />
-          </div>
+          {resumeText && (
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <Label className="text-sm font-medium">Extracted Resume Content</Label>
+              <p className="text-xs text-muted-foreground mt-1 mb-2">
+                Preview of extracted text ({resumeText.split(/\s+/).length} words)
+              </p>
+              <div className="max-h-[200px] overflow-y-auto text-sm font-mono bg-background p-3 rounded border">
+                {resumeText.slice(0, 1000)}
+                {resumeText.length > 1000 && "..."}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="targetRole">Target Role (Optional)</Label>
@@ -226,7 +301,7 @@ export const ResumeUploader = () => {
           <Button 
             className="w-full" 
             onClick={analyzeResume} 
-            disabled={isAnalyzing || !resumeText.trim()}
+            disabled={isAnalyzing || isParsing || !resumeText.trim()}
           >
             {isAnalyzing ? (
               <>
