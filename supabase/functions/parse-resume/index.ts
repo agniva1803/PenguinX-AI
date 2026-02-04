@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +26,9 @@ serve(async (req) => {
     if (fileName.endsWith('.txt')) {
       extractedText = await file.text();
     } else if (fileName.endsWith('.pdf')) {
-      // For PDF files, we'll use the AI to extract text from the content
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const base64 = base64Encode(arrayBuffer);
       
-      // Use AI to extract text from PDF
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -68,9 +67,8 @@ serve(async (req) => {
       const data = await response.json();
       extractedText = data.choices[0].message.content;
     } else if (fileName.endsWith('.docx')) {
-      // For DOCX files, use AI with file upload
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const base64 = base64Encode(arrayBuffer);
       
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
