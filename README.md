@@ -2,7 +2,7 @@
 
 An AI-powered career guidance and placement preparation platform designed to help students and professionals ace their job interviews and build successful careers.
 
-(![penguinx-logo](https://github.com/user-attachments/assets/645c6254-5856-431b-b921-2a70ad4f6c6a)
+![penguinx-logo](https://github.com/user-attachments/assets/645c6254-5856-431b-b921-2a70ad4f6c6a)
 
 
 ## 🌟 Features
