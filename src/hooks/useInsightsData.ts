@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+
+type AuthState = "loading" | "signed_in" | "signed_out";
 
 interface CodingAttempt {
   id: string;
@@ -65,6 +67,8 @@ interface InsightsStats {
 }
 
 export function useInsightsData() {
+  const [authState, setAuthState] = useState<AuthState>("loading");
+  const [userId, setUserId] = useState<string | null>(null);
   const [codingAttempts, setCodingAttempts] = useState<CodingAttempt[]>([]);
   const [aptitudeResults, setAptitudeResults] = useState<AptitudeResult[]>([]);
   const [interviewResults, setInterviewResults] = useState<InterviewResult[]>([]);
@@ -80,40 +84,88 @@ export function useInsightsData() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAllData();
+  const clearData = useCallback(() => {
+    setCodingAttempts([]);
+    setAptitudeResults([]);
+    setInterviewResults([]);
+    setResumeAnalyses([]);
+    setStats({
+      totalCodingAttempts: 0,
+      codingPassed: 0,
+      totalAptitudeTests: 0,
+      avgAptitudeScore: 0,
+      totalInterviews: 0,
+      avgInterviewScore: 0,
+      latestResumeScore: null,
+    });
   }, []);
 
-  const fetchAllData = async () => {
+  // Track auth state so Insights updates immediately after login/logout
+  useEffect(() => {
+    let mounted = true;
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      const uid = session?.user?.id ?? null;
+      setUserId(uid);
+      setAuthState(uid ? "signed_in" : "signed_out");
+    });
+
+    supabase.auth
+      .getSession()
+      .then(({ data: sessionData }) => {
+        if (!mounted) return;
+        const uid = sessionData.session?.user?.id ?? null;
+        setUserId(uid);
+        setAuthState(uid ? "signed_in" : "signed_out");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setUserId(null);
+        setAuthState("signed_out");
+      });
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const fetchAllData = useCallback(async (uid?: string) => {
+    const effectiveUserId = uid ?? userId;
+    if (!effectiveUserId) {
+      clearData();
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-
       // Fetch all data in parallel
       const [codingRes, aptitudeRes, interviewRes, resumeRes] = await Promise.all([
         supabase
           .from("coding_attempts")
           .select("*")
+          .eq("user_id", effectiveUserId)
           .order("created_at", { ascending: false })
           .limit(50),
         supabase
           .from("aptitude_test_results")
           .select("*")
+          .eq("user_id", effectiveUserId)
           .order("created_at", { ascending: false })
           .limit(50),
         supabase
           .from("interview_results")
           .select("*")
+          .eq("user_id", effectiveUserId)
           .order("created_at", { ascending: false })
           .limit(50),
         supabase
           .from("resume_analysis")
           .select("*")
+          .eq("user_id", effectiveUserId)
           .order("created_at", { ascending: false })
           .limit(10),
       ]);
@@ -158,7 +210,20 @@ export function useInsightsData() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearData, userId]);
+
+  useEffect(() => {
+    if (authState === "loading") return;
+
+    if (authState === "signed_out") {
+      clearData();
+      setIsLoading(false);
+      return;
+    }
+
+    // signed_in
+    void fetchAllData(userId ?? undefined);
+  }, [authState, userId, fetchAllData, clearData]);
 
   return {
     codingAttempts,
@@ -167,6 +232,7 @@ export function useInsightsData() {
     resumeAnalyses,
     stats,
     isLoading,
-    refetch: fetchAllData,
+    authState,
+    refetch: () => fetchAllData(userId ?? undefined),
   };
 }
