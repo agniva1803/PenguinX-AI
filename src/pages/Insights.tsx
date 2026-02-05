@@ -11,6 +11,8 @@ import {
 import { useInsightsData } from "@/hooks/useInsightsData";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const Insights = () => {
   const { 
@@ -19,7 +21,9 @@ const Insights = () => {
     interviewResults, 
     resumeAnalyses,
     stats, 
-    isLoading 
+    isLoading,
+    authState,
+    refetch,
   } = useInsightsData();
 
   const overallScore = Math.round(
@@ -48,6 +52,28 @@ const Insights = () => {
             Track your progress across coding, aptitude, and interview preparation
           </p>
         </motion.div>
+
+        {authState === "signed_out" && (
+          <Card variant="elevated">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                Sign in to see your history
+              </CardTitle>
+              <CardDescription>
+                Your progress is private and only visible when you’re signed in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row gap-3">
+              <Button asChild>
+                <Link to="/auth?mode=login">Sign in</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/auth?mode=signup">Create account</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Overview */}
         <motion.div
@@ -107,6 +133,14 @@ const Insights = () => {
             </>
           )}
         </motion.div>
+
+        {authState === "signed_in" && !isLoading && (
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => refetch()}>
+              Refresh
+            </Button>
+          </div>
+        )}
 
         {/* Detailed Tabs */}
         <motion.div
