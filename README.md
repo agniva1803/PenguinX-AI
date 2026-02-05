@@ -1,4 +1,4 @@
-# PenguinX AI 🐧
+## PenguinX AI 🐧
 
 An AI-powered career guidance and placement preparation platform designed to help students and professionals ace their job interviews and build successful careers.
 
