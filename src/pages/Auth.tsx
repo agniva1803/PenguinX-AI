@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { PenguinLogo } from "@/components/PenguinLogo";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, User } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -23,21 +24,15 @@ const Auth = () => {
   const { toast } = useToast();
 
   // Clear any stale session on mount to stop refresh token retry loops
-  useState(() => {
-    import("@/integrations/supabase/client").then(({ supabase }) => {
-      supabase.auth.getSession().catch(() => {
-        supabase.auth.signOut().catch(() => {});
-      });
-    });
-  });
+  useEffect(() => {
+    supabase.auth.signOut().catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
