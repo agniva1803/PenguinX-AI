@@ -23,25 +23,47 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Clear any stale session on mount to stop refresh token retry loops
+  // Clear stale session tokens from localStorage directly (no network call)
   useEffect(() => {
-    supabase.auth.signOut().catch(() => {});
+    // Remove all supabase auth keys from localStorage to stop stale refresh token retries
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    // Retry helper for transient network errors
+    const attempt = async (fn: () => Promise<any>, retries = 2): Promise<any> => {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          return await fn();
+        } catch (err: any) {
+          if (i === retries || err?.message !== "Failed to fetch") throw err;
+          await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        }
+      }
+    };
+
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin,
-          },
-        });
+        const { error } = await attempt(() =>
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { full_name: fullName },
+              emailRedirectTo: window.location.origin,
+            },
+          })
+        );
         if (error) throw error;
 
         toast({
@@ -50,7 +72,9 @@ const Auth = () => {
         });
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await attempt(() =>
+          supabase.auth.signInWithPassword({ email, password })
+        );
         if (error) throw error;
 
         toast({
@@ -66,7 +90,7 @@ const Auth = () => {
       toast({
         title: isNetworkError ? "Connection error" : "Error",
         description: isNetworkError
-          ? "Could not reach the server. Please check your internet connection and try again."
+          ? "Server is temporarily unavailable. Please wait a moment and try again."
           : message,
         variant: "destructive",
       });
