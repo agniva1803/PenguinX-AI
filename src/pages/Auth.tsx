@@ -22,6 +22,15 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Clear any stale session on mount to stop refresh token retry loops
+  useState(() => {
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      supabase.auth.getSession().catch(() => {
+        supabase.auth.signOut().catch(() => {});
+      });
+    });
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,13 +43,10 @@ const Auth = () => {
           email,
           password,
           options: {
-            data: {
-              full_name: fullName,
-            },
+            data: { full_name: fullName },
             emailRedirectTo: window.location.origin,
           },
         });
-
         if (error) throw error;
 
         toast({
@@ -49,11 +55,7 @@ const Auth = () => {
         });
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
         toast({
@@ -63,9 +65,14 @@ const Auth = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      const message = error?.message || "Something went wrong";
+      const isNetworkError = message === "Failed to fetch" || message.includes("NetworkError");
+
       toast({
-        title: "Error",
-        description: error.message || "Something went wrong",
+        title: isNetworkError ? "Connection error" : "Error",
+        description: isNetworkError
+          ? "Could not reach the server. Please check your internet connection and try again."
+          : message,
         variant: "destructive",
       });
     } finally {
