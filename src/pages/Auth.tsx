@@ -23,18 +23,16 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Clear stale session tokens from localStorage directly (no network call)
+  // If user is already logged in, redirect to dashboard
   useEffect(() => {
-    // Remove all supabase auth keys from localStorage to stop stale refresh token retries
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
-        keysToRemove.push(key);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        navigate("/dashboard", { replace: true });
       }
-    }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-  }, []);
+    }).catch(() => {
+      // Ignore network errors on initial check
+    });
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
