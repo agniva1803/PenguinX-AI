@@ -38,43 +38,26 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Retry helper for transient network errors
-    const attempt = async (fn: () => Promise<any>, retries = 2): Promise<any> => {
-      for (let i = 0; i <= retries; i++) {
-        try {
-          return await fn();
-        } catch (err: any) {
-          if (i === retries || err?.message !== "Failed to fetch") throw err;
-          await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
-        }
-      }
-    };
-
     try {
       if (mode === "signup") {
-        const { error } = await attempt(() =>
-          supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { full_name: fullName },
-              emailRedirectTo: window.location.origin,
-            },
-          })
-        );
-        if (error) throw error;
-
-        toast({
-          title: "Account created!",
-          description: "Welcome to PenguinX AI. Let's start your career journey!",
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName },
+          },
         });
-        navigate("/dashboard");
-      } else {
-        const { error } = await attempt(() =>
-          supabase.auth.signInWithPassword({ email, password })
-        );
         if (error) throw error;
-
+        if (data.user) {
+          toast({
+            title: "Account created!",
+            description: "Welcome to PenguinX AI. Let's start your career journey!",
+          });
+          navigate("/dashboard");
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         toast({
           title: "Welcome back!",
           description: "You've successfully signed in.",
@@ -82,14 +65,9 @@ const Auth = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      const message = error?.message || "Something went wrong";
-      const isNetworkError = message === "Failed to fetch" || message.includes("NetworkError");
-
       toast({
-        title: isNetworkError ? "Connection error" : "Error",
-        description: isNetworkError
-          ? "Server is temporarily unavailable. Please wait a moment and try again."
-          : message,
+        title: "Error",
+        description: error?.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
