@@ -38,6 +38,37 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    const tryAuthFallback = async () => {
+      const { data, error } = await supabase.functions.invoke("auth-fallback", {
+        body: {
+          mode,
+          email,
+          password,
+          fullName,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Auth fallback failed");
+      }
+
+      const accessToken = data?.session?.access_token;
+      const refreshToken = data?.session?.refresh_token;
+
+      if (!accessToken || !refreshToken) {
+        throw new Error(data?.error || "No session returned from fallback");
+      }
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (sessionError) {
+        throw sessionError;
+      }
+    };
+
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -65,9 +96,31 @@ const Auth = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      const message = error?.message || "Something went wrong. Please try again.";
+      const isFetchError = message === "Failed to fetch" || message.includes("NetworkError") || message.includes("fetch");
+
+      if (isFetchError) {
+        try {
+          await tryAuthFallback();
+          toast({
+            title: mode === "signup" ? "Account created!" : "Welcome back!",
+            description: "Signed in using backup auth route.",
+          });
+          navigate("/dashboard");
+          return;
+        } catch (fallbackError: any) {
+          toast({
+            title: "Connection error",
+            description: fallbackError?.message || "Unable to reach authentication service. Please try again in a moment.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       toast({
         title: "Error",
-        description: error?.message || "Something went wrong. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
