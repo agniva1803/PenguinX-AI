@@ -22,8 +22,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         setLoading(false);
       })
       .catch(() => {
-        // Network error or stale session — clear it and redirect to login
-        supabase.auth.signOut().catch(() => {});
+        // Network/proxy error or stale session — clear local session and redirect to login
+        supabase.auth.signOut({ scope: "local" }).catch(() => {});
         setAuthenticated(false);
         setLoading(false);
       });
