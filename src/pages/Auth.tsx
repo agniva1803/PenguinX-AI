@@ -23,14 +23,19 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const clearLocalSession = async () => {
+    await supabase.auth.signOut({ scope: "local" });
+  };
+
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         navigate("/dashboard", { replace: true });
       }
-    }).catch(() => {
-      // Ignore network errors on initial check
+    }).catch(async () => {
+      // Clear stale local tokens to stop refresh loops after network/proxy failures
+      await clearLocalSession().catch(() => {});
     });
   }, [navigate]);
 
@@ -39,17 +44,35 @@ const Auth = () => {
     setLoading(true);
 
     const tryAuthFallback = async () => {
-      const { data, error } = await supabase.functions.invoke("auth-fallback", {
-        body: {
-          mode,
-          email,
-          password,
-          fullName,
-        },
+      const payload = { mode, email, password, fullName };
+      let data: any | null = null;
+
+      const invokeResult = await supabase.functions.invoke("auth-fallback", {
+        body: payload,
       });
 
-      if (error) {
-        throw new Error(error.message || "Auth fallback failed");
+      if (!invokeResult.error && invokeResult.data) {
+        data = invokeResult.data;
+      } else {
+        const fallbackResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-fallback`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const fallbackData = await fallbackResponse.json().catch(() => ({}));
+
+        if (!fallbackResponse.ok) {
+          throw new Error(
+            fallbackData?.error || invokeResult.error?.message || "Auth fallback failed",
+          );
+        }
+
+        data = fallbackData;
       }
 
       const accessToken = data?.session?.access_token;
@@ -97,10 +120,17 @@ const Auth = () => {
       }
     } catch (error: any) {
       const message = error?.message || "Something went wrong. Please try again.";
-      const isFetchError = message === "Failed to fetch" || message.includes("NetworkError") || message.includes("fetch");
+      const normalizedMessage = message.toLowerCase();
+      const isFetchError =
+        normalizedMessage.includes("failed to fetch") ||
+        normalizedMessage.includes("networkerror") ||
+        normalizedMessage.includes("network request") ||
+        normalizedMessage.includes("fetch") ||
+        error?.name === "TypeError";
 
       if (isFetchError) {
         try {
+          await clearLocalSession().catch(() => {});
           await tryAuthFallback();
           toast({
             title: mode === "signup" ? "Account created!" : "Welcome back!",
