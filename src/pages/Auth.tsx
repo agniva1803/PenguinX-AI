@@ -29,7 +29,13 @@ const Auth = () => {
 
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        // getSession may resolve with an auth refresh error instead of throwing
+        await clearLocalSession().catch(() => {});
+        return;
+      }
+
       if (session?.user) {
         navigate("/dashboard", { replace: true });
       }
@@ -42,6 +48,9 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Ensure stale/broken refresh tokens don't interfere with a fresh auth attempt
+    await clearLocalSession().catch(() => {});
 
     const tryAuthFallback = async () => {
       const payload = { mode, email, password, fullName };

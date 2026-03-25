@@ -17,7 +17,15 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     });
 
     supabase.auth.getSession()
-      .then(({ data: { session } }) => {
+      .then(async ({ data: { session }, error }) => {
+        if (error) {
+          // getSession can resolve with refresh errors; clear stale local session
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          setAuthenticated(false);
+          setLoading(false);
+          return;
+        }
+
         setAuthenticated(!!session?.user);
         setLoading(false);
       })
