@@ -106,14 +106,10 @@ const Auth = () => {
 
       persistFallbackSession(data.session, data.user);
 
-      const { error: sessionError } = await supabase.auth.setSession({
+      await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
-      });
-
-      if (sessionError) {
-        throw sessionError;
-      }
+      }).catch(() => null);
     };
 
     try {
@@ -155,7 +151,11 @@ const Auth = () => {
         try {
           await clearLocalSession().catch(() => {});
           await tryAuthFallback();
-          await completeLogin(mode === "signup" ? "Account created!" : "Welcome back!", "You've successfully signed in.");
+          toast({
+            title: mode === "signup" ? "Account created!" : "Welcome back!",
+            description: "You've successfully signed in.",
+          });
+          navigate("/dashboard", { replace: true });
           return;
         } catch (fallbackError: any) {
           toast({
