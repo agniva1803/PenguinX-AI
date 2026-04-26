@@ -27,6 +27,18 @@ const Auth = () => {
     await supabase.auth.signOut({ scope: "local" });
   };
 
+  const completeLogin = async (title: string, description: string) => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session?.user) {
+      await clearLocalSession().catch(() => {});
+      throw new Error("Account was accepted, but the session was not created. Please try signing in again.");
+    }
+
+    toast({ title, description });
+    navigate("/dashboard", { replace: true });
+  };
+
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
@@ -108,24 +120,23 @@ const Auth = () => {
           password,
           options: {
             data: { full_name: fullName },
+            emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
-        if (data.user) {
+
+        if (data.session?.user) {
+          await completeLogin("Account created!", "Welcome to PenguinX AI. Let's start your career journey!");
+        } else if (data.user) {
           toast({
-            title: "Account created!",
-            description: "Welcome to PenguinX AI. Let's start your career journey!",
+            title: "Check your email",
+            description: "Your account was created. Please verify your email, then sign in.",
           });
-          navigate("/dashboard");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully signed in.",
-        });
-        navigate("/dashboard");
+        await completeLogin("Welcome back!", "You've successfully signed in.");
       }
     } catch (error: any) {
       const message = error?.message || "Something went wrong. Please try again.";
@@ -141,11 +152,7 @@ const Auth = () => {
         try {
           await clearLocalSession().catch(() => {});
           await tryAuthFallback();
-          toast({
-            title: mode === "signup" ? "Account created!" : "Welcome back!",
-            description: "Signed in using backup auth route.",
-          });
-          navigate("/dashboard");
+          await completeLogin(mode === "signup" ? "Account created!" : "Welcome back!", "You've successfully signed in.");
           return;
         } catch (fallbackError: any) {
           toast({
