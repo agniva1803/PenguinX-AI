@@ -39,6 +39,21 @@ const Auth = () => {
     navigate("/dashboard", { replace: true });
   };
 
+  const persistFallbackSession = (session: any, user: any) => {
+    const supabaseUrl = new URL(import.meta.env.VITE_SUPABASE_URL);
+    const storageKey = `sb-${supabaseUrl.hostname.split(".")[0]}-auth-token`;
+    const accessPayload = JSON.parse(atob(session.access_token.split(".")[1] ?? ""));
+
+    localStorage.setItem(storageKey, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: accessPayload.exp,
+      expires_in: Math.max(0, accessPayload.exp - Math.floor(Date.now() / 1000)),
+      token_type: "bearer",
+      user,
+    }));
+  };
+
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
@@ -66,34 +81,20 @@ const Auth = () => {
 
     const tryAuthFallback = async () => {
       const payload = { mode, email, password, fullName };
-      let data: any | null = null;
-
-      const invokeResult = await supabase.functions.invoke("auth-fallback", {
-        body: payload,
+      const fallbackResponse = await fetch("/cloud-functions/auth-fallback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (!invokeResult.error && invokeResult.data) {
-        data = invokeResult.data;
-      } else {
-        const fallbackResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-fallback`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify(payload),
-        });
+      const data = await fallbackResponse.json().catch(() => ({}));
 
-        const fallbackData = await fallbackResponse.json().catch(() => ({}));
-
-        if (!fallbackResponse.ok) {
-          throw new Error(
-            fallbackData?.error || invokeResult.error?.message || "Auth fallback failed",
-          );
-        }
-
-        data = fallbackData;
+      if (!fallbackResponse.ok) {
+        throw new Error(data?.error || "Auth fallback failed");
       }
 
       const accessToken = data?.session?.access_token;
@@ -103,14 +104,12 @@ const Auth = () => {
         throw new Error(data?.error || "No session returned from fallback");
       }
 
-      const { error: sessionError } = await supabase.auth.setSession({
+      persistFallbackSession(data.session, data.user);
+
+      await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
-      });
-
-      if (sessionError) {
-        throw sessionError;
-      }
+      }).catch(() => null);
     };
 
     try {
@@ -152,7 +151,11 @@ const Auth = () => {
         try {
           await clearLocalSession().catch(() => {});
           await tryAuthFallback();
-          await completeLogin(mode === "signup" ? "Account created!" : "Welcome back!", "You've successfully signed in.");
+          toast({
+            title: mode === "signup" ? "Account created!" : "Welcome back!",
+            description: "You've successfully signed in.",
+          });
+          navigate("/dashboard", { replace: true });
           return;
         } catch (fallbackError: any) {
           toast({
