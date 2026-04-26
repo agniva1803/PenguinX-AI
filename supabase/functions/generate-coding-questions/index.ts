@@ -65,12 +65,12 @@ serve(async (req) => {
 - Should challenge experienced programmers, taking 30-45+ minutes`
     };
     
-    const systemPrompt = `You are an expert coding interview question generator for FAANG-level interviews. Generate ${count} coding problem(s) at STRICTLY ${difficulty.toUpperCase()} difficulty level.
+    const systemPrompt = `You are an expert coding interview question generator for FAANG-level interviews. Generate ${safeCount} coding problem(s) at STRICTLY ${difficulty.toUpperCase()} difficulty level.
 
 DIFFICULTY REQUIREMENTS for ${difficulty.toUpperCase()}:
 ${difficultyGuide[difficulty] || difficultyGuide.medium}
 
-${topic ? `TOPIC FOCUS: ${topic}` : 'Cover common interview topics like arrays, strings, algorithms, and data structures.'}
+${topic ? `TOPIC FOCUS: ${safeTopic}` : 'Cover common interview topics like arrays, strings, algorithms, and data structures.'}
 
 CRITICAL RULES:
 1. The difficulty MUST match "${difficulty}". Do NOT generate easier problems.
@@ -118,7 +118,7 @@ Respond ONLY with valid JSON (no markdown code blocks):
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate ${count} ${difficulty} level coding question(s)${topic ? ` about ${topic}` : ''}.` }
+          { role: "user", content: `Generate ${safeCount} ${difficulty} level coding question(s)${topic ? ` about ${safeTopic}` : ''}.` }
         ],
         max_tokens: 8192,
         temperature: 0.7,
