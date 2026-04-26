@@ -51,7 +51,7 @@ Your analysis should include:
 6. **Format Recommendations**: Layout and structure improvements
 7. **Action Items**: Top 5 priority changes to make
 
-${targetRole ? `The candidate is targeting: ${targetRole}. Tailor your feedback accordingly.` : ''}
+${safeTargetRole ? `The candidate is targeting: ${safeTargetRole}. Tailor your feedback accordingly.` : ''}
 
 Respond in JSON format with the following structure:
 {
