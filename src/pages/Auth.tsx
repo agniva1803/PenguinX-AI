@@ -126,11 +126,11 @@ const Auth = () => {
 
         if (data.session?.user) {
           await completeLogin("Account created!", "Welcome to PenguinX AI. Let's start your career journey!");
-        } else if (data.user) {
-          toast({
-            title: "Check your email",
-            description: "Your account was created. Please verify your email, then sign in.",
-          });
+        } else {
+          // Auto sign-in immediately after signup (no email verification required)
+          const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInError) throw signInError;
+          await completeLogin("Account created!", "Welcome to PenguinX AI. Let's start your career journey!");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
