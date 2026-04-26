@@ -11,6 +11,13 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/cloud-functions": {
+        target: "https://armkjtcnlrzoynsujtps.supabase.co",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/cloud-functions/, "/functions/v1"),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
