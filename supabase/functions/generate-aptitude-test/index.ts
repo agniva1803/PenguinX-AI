@@ -48,7 +48,7 @@ serve(async (req) => {
       verbal: "verbal ability questions including reading comprehension, vocabulary, grammar, and sentence completion"
     };
 
-    const systemPrompt = `You are an expert aptitude test creator. Generate ${questionCount} ${testType} aptitude questions.
+    const systemPrompt = `You are an expert aptitude test creator. Generate ${safeCount} ${testType} aptitude questions.
 
 Focus on: ${typeDescriptions[testType] || "general aptitude"}
 
@@ -87,7 +87,7 @@ Respond in JSON format:
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate ${questionCount} ${testType} aptitude questions for a placement test.` }
+          { role: "user", content: `Generate ${safeCount} ${testType} aptitude questions for a placement test.` }
         ],
         max_tokens: 4096,
         temperature: 0.7,
