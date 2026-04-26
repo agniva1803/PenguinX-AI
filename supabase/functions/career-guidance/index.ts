@@ -64,9 +64,9 @@ Always be supportive and help users feel confident about their career journey.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...conversationHistory.map((msg: { role: string; content: string }) => ({
+      ...safeHistory.map((msg: { role: string; content: string }) => ({
         role: msg.role,
-        content: msg.content
+        content: typeof msg.content === 'string' ? msg.content.slice(0, 4000) : ''
       })),
       { role: "user", content: message }
     ];
